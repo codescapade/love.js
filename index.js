@@ -12,6 +12,8 @@ commander
   .option('-t, --title <string>', 'specify game name')
   .option('-m, --memory [bytes]', 'how much memory your game will require [16777216]', 16777216)
   .option('-c, --compatibility', 'specify flag to use compatibility version')
+  .option('-g, --game-only', 'Only create game.js and game.data')
+  .option('-d, --data-path <string>', 'Specify the path where game.data is loaded from')
   .arguments('<input> <output>')
   .action((input, output) => {
     commander.input = input;
@@ -42,10 +44,12 @@ const getAdditionalInfo = async function getAdditionalInfo(parsedArgs) {
     input: parsedArgs.input,
     output: parsedArgs.output,
     compat: parsedArgs.compatibility,
+    title: parsedArgs.title || 'Love Game',
+    gameOnly: parsedArgs.gameOnly || false,
+    dataPath: parsedArgs.dataPath || '',
   };
   args.input = parsedArgs.input || await prompt('Love file or directory: ');
   args.output = parsedArgs.output || await prompt('Output directory: ');
-  args.title = parsedArgs.title || await prompt('Game name: ');
 
   if (isDirectory(args.input)) {
     args.arguments = JSON.stringify(['./']);
@@ -118,6 +122,7 @@ getAdditionalInfo(commander).then((args) => {
       package_uuid: uuid(),
       remote_package_size: totalBuffer.length,
       files: fileMetadata,
+      datapath: args.dataPath ? `${args.dataPath}/` : '',
     }),
   };
   const gameTemplate = fs.readFileSync(`${srcDir}/game.js`, 'utf8');
@@ -125,22 +130,25 @@ getAdditionalInfo(commander).then((args) => {
 
   fs.mkdirsSync(`${outputDir}`);
 
-  const fldr_name = args.compat ? "compat" : "release";
+  const fldrName = args.compat ? 'compat' : 'release';
 
   {
-    const template = fs.readFileSync(`${srcDir}/${fldr_name}/index.html`, 'utf8');
+    const template = fs.readFileSync(`${srcDir}/${fldrName}/index.html`, 'utf8');
     const renderedTemplate = mustache.render(template, args);
 
     fs.mkdirsSync(outputDir);
-    fs.writeFileSync(`${outputDir}/index.html`, renderedTemplate);
     fs.writeFileSync(`${outputDir}/game.js`, renderedGameTemplate);
     fs.writeFileSync(`${outputDir}/game.data`, totalBuffer);
-    fs.copySync(`${srcDir}/${fldr_name}/love.js`, `${outputDir}/love.js`);
-    fs.copySync(`${srcDir}/${fldr_name}/love.wasm`, `${outputDir}/love.wasm`);
-    fs.copySync(`${srcDir}/${fldr_name}/theme`, `${outputDir}/theme`);
 
-    if (fldr_name === "release") {
-      fs.copySync(`${srcDir}/${fldr_name}/love.worker.js`, `${outputDir}/love.worker.js`);
+    if (!args.gameOnly) {
+      fs.writeFileSync(`${outputDir}/index.html`, renderedTemplate);
+      fs.copySync(`${srcDir}/${fldrName}/love.js`, `${outputDir}/love.js`);
+      fs.copySync(`${srcDir}/${fldrName}/love.wasm`, `${outputDir}/love.wasm`);
+      fs.copySync(`${srcDir}/${fldrName}/theme`, `${outputDir}/theme`);
+    }
+
+    if (fldrName === 'release') {
+      fs.copySync(`${srcDir}/${fldrName}/love.worker.js`, `${outputDir}/love.worker.js`);
     }
   }
 }).catch((e) => {
